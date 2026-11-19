@@ -68,13 +68,13 @@
 		</p>
 
 		<h2>Overview</h2>
-		<p>We built a real-time cloth simulator by connecting a grid of point masses with structural, shearing, and bending springs. Damped Verlet integration advances the cloth under gravity, and a stretch limit keeps the springs from extending too far. We added collisions with spheres and planes and used spatial hashing to check for collisions between nearby masses on the cloth. We then used GLSL shaders to render lighting, textures, surface relief, and reflections, including a custom iridescent shader.</p>
+		<p>I built a real-time cloth simulator by connecting a grid of point masses with structural, shearing, and bending springs. Damped Verlet integration advances the cloth under gravity, and a stretch limit keeps the springs from extending too far. I added collisions with spheres and planes and used spatial hashing to check for collisions between nearby masses on the cloth. I then used GLSL shaders to render lighting, textures, surface relief, and reflections, including a custom iridescent shader.</p>
 		<p>The experiments showed that stiffness, density, and damping affect different aspects of the motion. Stiffer cloth sagged less, and higher damping slowed the free edge during the fall. The rendering comparisons showed how bump mapping can reveal fine surface detail on a coarse sphere, while displacement depends on having enough vertices to represent changes in height.</p>
 
 		<h2>Part 1: Masses and springs</h2>
-		<p>In <code>Cloth::buildGrid</code>, we create an evenly spaced grid of point masses and store them in row-major order. Horizontal cloth lies in the <em>xz</em> plane at <em>y</em> = 1. Vertical cloth spans the <em>xy</em> plane with a small random offset along <em>z</em>. We mark the masses listed in the scene's pinned coordinates.</p>
+		<p>In <code>Cloth::buildGrid</code>, I create an evenly spaced grid of point masses and store them in row-major order. Horizontal cloth lies in the <em>xz</em> plane at <em>y</em> = 1. Vertical cloth spans the <em>xy</em> plane with a small random offset along <em>z</em>. I mark the masses listed in the scene's pinned coordinates.</p>
 
-		<p>Once all masses are in place, we add springs. Structural springs connect each mass to its immediate left and upper neighbors. Shearing springs connect to the upper-left and upper-right diagonal neighbors. Bending springs connect masses two grid positions apart along a row or column.</p>
+		<p>Once all masses are in place, I add springs. Structural springs connect each mass to its immediate left and upper neighbors. Shearing springs connect to the upper-left and upper-right diagonal neighbors. Bending springs connect masses two grid positions apart along a row or column.</p>
 
 		<p>These wireframes compare the spring configurations for <code>scene/pinned2.json</code>.</p>
 
@@ -94,9 +94,9 @@
 		</figure>
 
 		<h2>Part 2: Simulation via numerical integration</h2>
-		<p>At each timestep, we reset the force on each point mass to the sum of the external forces and add equal and opposite Hooke’s law forces from each enabled spring. Bending springs use 20% of the base stiffness. We use damped Verlet integration to advance each unpinned mass from its current and previous positions and its current acceleration. After integration, we correct springs longer than 110% of their rest length, moving both endpoints equally when both are free and applying the entire correction to the free endpoint when the other is pinned.</p>
+		<p>At each timestep, I reset the force on each point mass to the sum of the external forces and add equal and opposite Hooke’s law forces from each enabled spring. Bending springs use 20% of the base stiffness. I use damped Verlet integration to advance each unpinned mass from its current and previous positions and its current acceleration. After integration, I correct springs longer than 110% of their rest length, moving both endpoints equally when both are free and applying the entire correction to the free endpoint when the other is pinned.</p>
 
-		<p>We ran the parameter comparisons on <code>pinned2.json</code> with one setting changed at a time. The simulator displayed default values of 5,000 N/m stiffness, 15 g/cm² density, and 0.2% damping.</p>
+		<p>I ran the parameter comparisons on <code>pinned2.json</code> with one setting changed at a time. The simulator displayed default values of 5,000 N/m stiffness, 15 g/cm² density, and 0.2% damping.</p>
 
 		<h3>Default behavior</h3>
 		<p>The two pinned corners stay fixed while the free edge swings down. At rest, the sheet hangs nearly vertically with a curved top edge.</p>
@@ -146,7 +146,7 @@
 		</div>
 
 		<h3>Damping</h3>
-		<p>We paused each run after 40 presses of <kbd>N</kbd> from release. At 0.022989%, the free edge had dropped the farthest and the surface showed more ripples. At the default 0.2%, the free edge still projected farther outward. At 0.505747%, it stayed highest. Higher damping slowed the fall by reducing how much motion carried over from each timestep.</p>
+		<p>I paused each run after 40 presses of <kbd>N</kbd> from release. At 0.022989%, the free edge had dropped the farthest and the surface showed more ripples. At the default 0.2%, the free edge still projected farther outward. At 0.505747%, it stayed highest. Higher damping slowed the fall by reducing how much motion carried over from each timestep.</p>
 		<div class="figure-grid">
 			<figure style="margin: 0; break-inside: avoid;">
 				<img src="assets/part2-damping-low.png" alt="0.022989% after 40 presses of N" style="width: 100%;">
@@ -163,7 +163,7 @@
 		</div>
 
 		<h3>Four pinned corners</h3>
-		<p>In <code>pinned4.json</code>, the four fixed corners support the cloth while the center sags under gravity. We captured the resting shape in Normal mode with the default simulation settings.</p>
+		<p>In <code>pinned4.json</code>, the four fixed corners support the cloth while the center sags under gravity. I captured the resting shape in Normal mode with the default simulation settings.</p>
 		<div class="figure-grid">
 			<figure style="margin: 0; break-inside: avoid;">
 				<img src="assets/part2-pinned4-rest.png" alt="Four-corner cloth at rest" style="width: 100%;">
@@ -172,11 +172,11 @@
 		</div>
 
 		<h2>Part 3: Handling collisions with other objects</h2>
-		<p>After Verlet integration and before the spring stretch correction, we check each unpinned point mass against every collision object. For each collision, we compute a target position and move the mass from its previous position toward that target by a fraction of <code>1 - friction</code>.</p>
+		<p>After Verlet integration and before the spring stretch correction, I check each unpinned point mass against every collision object. For each collision, I compute a target position and move the mass from its previous position toward that target by a fraction of <code>1 - friction</code>.</p>
 
 		<h3>Sphere collisions</h3>
-		<p>We compare the mass's distance from the sphere center with the radius. If the mass is on or inside the sphere, we project it outward along the radial direction to find the surface target.</p>
-		<p>In <code>sphere.json</code>, we varied spring stiffness while holding density and damping fixed. At rest, the low-stiffness cloth hugged the sphere more closely. The default run had a wider drape with a distinct front fold. The highest stiffness produced the broadest folds and the most outward flare.</p>
+		<p>I compare the mass's distance from the sphere center with the radius. If the mass is on or inside the sphere, I project it outward along the radial direction to find the surface target.</p>
+		<p>In <code>sphere.json</code>, I varied spring stiffness while holding density and damping fixed. At rest, the low-stiffness cloth hugged the sphere more closely. The default run had a wider drape with a distinct front fold. The highest stiffness produced the broadest folds and the most outward flare.</p>
 		<div class="figure-grid">
 			<figure style="margin: 0; break-inside: avoid;">
 				<img src="assets/part3-sphere-ks-500.png" alt="Cloth wraps closely around the sphere and hangs in narrow folds." style="width: 100%;">
@@ -193,7 +193,7 @@
 		</div>
 
 		<h3>Plane collisions</h3>
-		<p>We compare the signed distances of the previous and current positions along the plane normal to detect a crossing. When a mass crosses, we project its current position onto the plane and offset the target slightly toward its original side. The cloth in <code>plane.json</code> settles flat on the surface.</p>
+		<p>I compare the signed distances of the previous and current positions along the plane normal to detect a crossing. When a mass crosses, I project its current position onto the plane and offset the target slightly toward its original side. The cloth in <code>plane.json</code> settles flat on the surface.</p>
 		<figure style="margin: 0; break-inside: avoid;">
 				<img src="assets/part3-plane-rest.png" alt="The cloth lies flat as the smaller, brighter rectangle on the plane." style="width: 100%;">
 				<figcaption><strong>Plane at rest.</strong> The cloth lies flat as the smaller, brighter rectangle on the plane.</figcaption>
@@ -201,8 +201,8 @@
 
 
 		<h2>Part 4: Handling self-collisions</h2>
-		<p>After Verlet integration, we rebuild a spatial hash of the point masses. We divide space into boxes whose width and height are three times the corresponding cloth dimension divided by its point count. The box depth is the larger of those two values. We round down to get the box coordinates and hash those coordinates into a bucket key. This lets each mass check a local set of candidates instead of scanning the entire cloth.</p>
-		<p>For each unpinned mass, we check the other masses in its bucket. When a neighbor is closer than twice the cloth thickness, we compute a displacement away from it based on how much the pair falls short of that distance. We average the displacements and divide by the number of simulation substeps before applying the result. Pinned masses stay fixed and still count as collision candidates.</p>
+		<p>After Verlet integration, I rebuild a spatial hash of the point masses. I divide space into boxes whose width and height are three times the corresponding cloth dimension divided by its point count. The box depth is the larger of those two values. I round down to get the box coordinates and hash those coordinates into a bucket key. This lets each mass check a local set of candidates instead of scanning the entire cloth.</p>
+		<p>For each unpinned mass, I check the other masses in its bucket. When a neighbor is closer than twice the cloth thickness, I compute a displacement away from it based on how much the pair falls short of that distance. I average the displacements and divide by the number of simulation substeps before applying the result. Pinned masses stay fixed and still count as collision candidates.</p>
 
 		<h3>Folding sequence</h3>
 		<p>In <code>selfCollision.json</code>, the bottom edge buckles when it reaches the plane. As the upper cloth continues falling, folds collect near the floor and eventually form a low pile.</p>
@@ -222,7 +222,7 @@
 		</div>
 
 		<h3>Density and stiffness</h3>
-		<p>We captured each comparison after 30 presses of <kbd>N</kbd> from reset, changing one parameter per run. Raising the displayed density from 15 to 60 g/cm² at 5,000 N/m produced a similar overall shape at this point in the fall. The denser cloth showed finer ripples across its lower half, while the default had broader folds near the floor. Raising stiffness from 5,000 to 50,000 N/m at the default density produced a broader roll near the floor and fewer tight ripples above it. Damping was 0.2% in all three runs.</p>
+		<p>I captured each comparison after 30 presses of <kbd>N</kbd> from reset, changing one parameter per run. Raising the displayed density from 15 to 60 g/cm² at 5,000 N/m produced a similar overall shape at this point in the fall. The denser cloth showed finer ripples across its lower half, while the default had broader folds near the floor. Raising stiffness from 5,000 to 50,000 N/m at the default density produced a broader roll near the floor and fewer tight ripples above it. Damping was 0.2% in all three runs.</p>
 		<div class="figure-grid">
 			<figure style="margin: 0; break-inside: avoid;">
 				<img src="assets/part4-density-default.png" alt="Default settings after 30 presses of N." style="width: 100%;">
@@ -273,7 +273,7 @@
 		</div>
 
 		<h3>Bump and displacement mapping</h3>
-		<p>Both shaders sample the same non-default height map from <code>textures/texture_3.png</code>. The relief was initially faint, so we increased the normal scaling to make the stone joints visible. Bump mapping estimates the height change in each UV direction and uses the tangent, bitangent, and normal to turn those slopes into a perturbed shading normal. This makes the stone joints visible while leaving the mesh silhouette unchanged. Displacement mapping also moves each vertex along its original normal by the sampled height times the height scale, so the map can affect the silhouette.</p>
+		<p>Both shaders sample the same non-default height map from <code>textures/texture_3.png</code>. The relief was initially faint, so I increased the normal scaling to make the stone joints visible. Bump mapping estimates the height change in each UV direction and uses the tangent, bitangent, and normal to turn those slopes into a perturbed shading normal. This makes the stone joints visible while leaving the mesh silhouette unchanged. Displacement mapping also moves each vertex along its original normal by the sampled height times the height scale, so the map can affect the silhouette.</p>
 
 		<h4>Default-resolution views</h4>
 		<div class="figure-grid figure-grid--pair">
@@ -330,7 +330,7 @@
 
 
 		<h2>Extra credit: Iridescent cloth shader</h2>
-		<p>Our custom fragment shader computes the angle between the surface normal and the direction to the camera. It uses <code>1 - clamp(dot(n, v), 0, 1)</code> to blend smoothly from blue on surfaces facing the camera, through violet at intermediate angles, to gold near glancing angles. Diffuse lighting and a specular highlight make the folds visible as the colors shift with the view.</p>
+		<p>My custom fragment shader computes the angle between the surface normal and the direction to the camera. It uses <code>1 - clamp(dot(n, v), 0, 1)</code> to blend smoothly from blue on surfaces facing the camera, through violet at intermediate angles, to gold near glancing angles. Diffuse lighting and a specular highlight make the folds visible as the colors shift with the view.</p>
 		<div class="figure-grid figure-grid--pair">
 			<figure style="margin: 0; break-inside: avoid;">
 				<img src="assets/part5-custom-iridescent-draped.png" alt="Blue and violet cloth draped over a sphere, with a thin gold rim">
