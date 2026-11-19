@@ -1,7 +1,7 @@
 <html>
 	<head>
 		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 		<style>
 			h1 {
 				text-align: center;
@@ -23,87 +23,327 @@
 			body {
 				font-family: 'Inter', sans-serif;
 			}
+			figcaption {
+				margin-top: 0.4em;
+				font-family: Georgia, "Times New Roman", serif;
+				font-size: 0.875em;
+				line-height: 1.4;
+				color: #595959;
+			}
+
+			.figure-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+				align-items: start;
+				gap: 1em;
+			}
+
+			.figure-grid--pair {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.figure-grid > figure:not(:only-child) > img {
+				display: block;
+				width: 100%;
+				aspect-ratio: 4 / 3;
+				object-fit: contain;
+			}
+
+			@media screen and (max-width: 600px) {
+				.figure-grid--pair {
+					grid-template-columns: 1fr;
+				}
+			}
+
 		</style>
 	</head>
 	<body>
 		<div class="container">
-		<h1>CS184/284A Fall 2026 Homework 4 Write-Up</h1>
-		<div style="text-align: center;">Names: </div>
+		<h1 style="font-weight: 700;">CS184/284A Fall 2026 Homework 4 Write-Up</h1>
+		<div style="text-align: center; font-weight: 700;">Diego Jiang</div>
 
-		<br>
-
-		Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
-
-		<br>
-
-		Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
-
-		<figure>
-			<img src="assets/clothsim.png" alt="Cloth draped over sphere" style="width:70%"/>
-			<figcaption>You can add images with captions!</figcaption>
-		</figure>
-
-		<!--
-		We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
-		-->
+		<p>
+			Link to webpage: <a href="https://cal-cs184-student.github.io/hw4-diego-jiang-writeup/">https://cal-cs184-student.github.io/hw4-diego-jiang-writeup/</a><br>
+			Link to GitHub repository: <a href="https://github.com/cal-cs184-student/hw4-diego-jiang">https://github.com/cal-cs184-student/hw4-diego-jiang</a>
+		</p>
 
 		<h2>Overview</h2>
-		Give a high-level overview of what you implemented in this homework. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the homework.
+		<p>We built a real-time cloth simulator by connecting a grid of point masses with structural, shearing, and bending springs. Damped Verlet integration advances the cloth under gravity, and a stretch limit keeps the springs from extending too far. We added collisions with spheres and planes and used spatial hashing to check for collisions between nearby masses on the cloth. We then used GLSL shaders to render lighting, textures, surface relief, and reflections, including a custom iridescent shader.</p>
+		<p>The experiments showed that stiffness, density, and damping affect different aspects of the motion. Stiffer cloth sagged less, and higher damping slowed the free edge during the fall. The rendering comparisons showed how bump mapping can reveal fine surface detail on a coarse sphere, while displacement depends on having enough vertices to represent changes in height.</p>
 
 		<h2>Part 1: Masses and springs</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>In <code>Cloth::buildGrid</code>, we create an evenly spaced grid of point masses and store them in row-major order. Horizontal cloth lies in the <em>xz</em> plane at <em>y</em> = 1. Vertical cloth spans the <em>xy</em> plane with a small random offset along <em>z</em>. We mark the masses listed in the scene's pinned coordinates.</p>
 
-		<p>Here is an example 2x2 gridlike structure using an HTML table. Each <b>tr</b> is a row and each <b>td</b> is a column in that row. You might find this useful for framing and showing your result images in an organized fashion.</p>
-		<div style="display: flex; flex-direction: column; align-items: center;">
-			<table style="width: 100%; text-align: center; border-collapse: collapse;">
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/clothsim.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-				<td style="text-align: center;">
-				  <img src="assets/clothsim.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/clothsim.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-				<td style="text-align: center;">
-				  <img src="assets/clothsim.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			</table>
-		</div>
+		<p>Once all masses are in place, we add springs. Structural springs connect each mass to its immediate left and upper neighbors. Shearing springs connect to the upper-left and upper-right diagonal neighbors. Bending springs connect masses two grid positions apart along a row or column.</p>
+
+		<p>These wireframes compare the spring configurations for <code>scene/pinned2.json</code>.</p>
+
+		<figure style="margin: 1.5em 0; break-inside: avoid;">
+			<img src="assets/part1-no-shearing.png" alt="A grid of row and column springs with no diagonals" style="width: 100%;">
+			<figcaption><strong>Shearing disabled.</strong> Structural and bending springs follow the same rows and columns on the flat cloth.</figcaption>
+		</figure>
+
+		<figure style="margin: 1.5em 0; break-inside: avoid;">
+			<img src="assets/part1-shearing-only.png" alt="Diagonal springs crossing the cloth grid in both directions" style="width: 100%;">
+			<figcaption><strong>Shearing only.</strong> The diagonal springs form a crisscross pattern with a stepped outline.</figcaption>
+		</figure>
+
+		<figure style="margin: 1.5em 0; break-inside: avoid;">
+			<img src="assets/part1-all-constraints.png" alt="A dense wireframe showing both the row and column grid and diagonal springs" style="width: 100%;">
+			<figcaption><strong>All constraints enabled.</strong> The row and column springs and the diagonal springs are visible together.</figcaption>
+		</figure>
 
 		<h2>Part 2: Simulation via numerical integration</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>At each timestep, we reset the force on each point mass to the sum of the external forces and add equal and opposite Hooke’s law forces from each enabled spring. Bending springs use 20% of the base stiffness. We use damped Verlet integration to advance each unpinned mass from its current and previous positions and its current acceleration. After integration, we correct springs longer than 110% of their rest length, moving both endpoints equally when both are free and applying the entire correction to the free endpoint when the other is pinned.</p>
+
+		<p>We ran the parameter comparisons on <code>pinned2.json</code> with one setting changed at a time. The simulator displayed default values of 5,000 N/m stiffness, 15 g/cm² density, and 0.2% damping.</p>
+
+		<h3>Default behavior</h3>
+		<p>The two pinned corners stay fixed while the free edge swings down. At rest, the sheet hangs nearly vertically with a curved top edge.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-default-midfall.png" alt="Default settings during the fall" style="width: 100%;">
+				<figcaption>Default settings during the fall</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-default-rest.png" alt="Default settings at rest" style="width: 100%;">
+				<figcaption>Default settings at rest</figcaption>
+			</figure>
+		</div>
+
+		<h3>Spring stiffness</h3>
+		<p>At 500 N/m, the cloth hung with a slightly deeper sag and a more pronounced fold beneath the pinned edge than at the default 5,000 N/m. At 50,000 N/m, the cloth looked smoother as it fell, and the top edge stayed much flatter at rest. A stiffer spring produces a larger restoring force for the same stretch.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-ks-low.png" alt="500 N/m at rest" style="width: 100%;">
+				<figcaption>500 N/m at rest</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-default-rest.png" alt="5,000 N/m at rest" style="width: 100%;">
+				<figcaption>5,000 N/m at rest</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-ks-high.png" alt="50,000 N/m at rest" style="width: 100%;">
+				<figcaption>50,000 N/m at rest</figcaption>
+			</figure>
+		</div>
+
+		<h3>Density</h3>
+		<p>With stiffness fixed at 5,000 N/m and damping at 0.2%, the 4 g/cm² cloth rested with a shallower curve between the pins than the 15 g/cm² baseline. The 60 g/cm² cloth sagged farther and developed a more pronounced fold beneath the top edge. Increasing density increases the weight supported by the same springs.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-density-low.png" alt="4 g/cm² at rest" style="width: 100%;">
+				<figcaption>4 g/cm² at rest</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-default-rest.png" alt="15 g/cm² at rest" style="width: 100%;">
+				<figcaption>15 g/cm² at rest</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-density-high.png" alt="60 g/cm² at rest" style="width: 100%;">
+				<figcaption>60 g/cm² at rest</figcaption>
+			</figure>
+		</div>
+
+		<h3>Damping</h3>
+		<p>We paused each run after 40 presses of <kbd>N</kbd> from release. At 0.022989%, the free edge had dropped the farthest and the surface showed more ripples. At the default 0.2%, the free edge still projected farther outward. At 0.505747%, it stayed highest. Higher damping slowed the fall by reducing how much motion carried over from each timestep.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-damping-low.png" alt="0.022989% after 40 presses of N" style="width: 100%;">
+				<figcaption>0.022989% after 40 presses of N</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-damping-default.png" alt="0.2% after 40 presses of N" style="width: 100%;">
+				<figcaption>0.2% after 40 presses of N</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-damping-high.png" alt="0.505747% after 40 presses of N" style="width: 100%;">
+				<figcaption>0.505747% after 40 presses of N</figcaption>
+			</figure>
+		</div>
+
+		<h3>Four pinned corners</h3>
+		<p>In <code>pinned4.json</code>, the four fixed corners support the cloth while the center sags under gravity. We captured the resting shape in Normal mode with the default simulation settings.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part2-pinned4-rest.png" alt="Four-corner cloth at rest" style="width: 100%;">
+				<figcaption>Four-corner cloth at rest</figcaption>
+			</figure>
+		</div>
 
 		<h2>Part 3: Handling collisions with other objects</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>After Verlet integration and before the spring stretch correction, we check each unpinned point mass against every collision object. For each collision, we compute a target position and move the mass from its previous position toward that target by a fraction of <code>1 - friction</code>.</p>
+
+		<h3>Sphere collisions</h3>
+		<p>We compare the mass's distance from the sphere center with the radius. If the mass is on or inside the sphere, we project it outward along the radial direction to find the surface target.</p>
+		<p>In <code>sphere.json</code>, we varied spring stiffness while holding density and damping fixed. At rest, the low-stiffness cloth hugged the sphere more closely. The default run had a wider drape with a distinct front fold. The highest stiffness produced the broadest folds and the most outward flare.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part3-sphere-ks-500.png" alt="Cloth wraps closely around the sphere and hangs in narrow folds." style="width: 100%;">
+				<figcaption><strong>500 N/m.</strong> Cloth wraps closely around the sphere and hangs in narrow folds.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part3-sphere-ks-5000.png" alt="The drape is wider, with a prominent fold hanging down the front." style="width: 100%;">
+				<figcaption><strong>5,000 N/m (default).</strong> The drape is wider, with a prominent fold hanging down the front.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part3-sphere-ks-50000.png" alt="Broader folds flare out around the sphere." style="width: 100%;">
+				<figcaption><strong>50,000 N/m.</strong> Broader folds flare out around the sphere.</figcaption>
+			</figure>
+		</div>
+
+		<h3>Plane collisions</h3>
+		<p>We compare the signed distances of the previous and current positions along the plane normal to detect a crossing. When a mass crosses, we project its current position onto the plane and offset the target slightly toward its original side. The cloth in <code>plane.json</code> settles flat on the surface.</p>
+		<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part3-plane-rest.png" alt="The cloth lies flat as the smaller, brighter rectangle on the plane." style="width: 100%;">
+				<figcaption><strong>Plane at rest.</strong> The cloth lies flat as the smaller, brighter rectangle on the plane.</figcaption>
+			</figure>
+
 
 		<h2>Part 4: Handling self-collisions</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>After Verlet integration, we rebuild a spatial hash of the point masses. We divide space into boxes whose width and height are three times the corresponding cloth dimension divided by its point count. The box depth is the larger of those two values. We round down to get the box coordinates and hash those coordinates into a bucket key. This lets each mass check a local set of candidates instead of scanning the entire cloth.</p>
+		<p>For each unpinned mass, we check the other masses in its bucket. When a neighbor is closer than twice the cloth thickness, we compute a displacement away from it based on how much the pair falls short of that distance. We average the displacements and divide by the number of simulation substeps before applying the result. Pinned masses stay fixed and still count as collision candidates.</p>
+
+		<h3>Folding sequence</h3>
+		<p>In <code>selfCollision.json</code>, the bottom edge buckles when it reaches the plane. As the upper cloth continues falling, folds collect near the floor and eventually form a low pile.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part4-default-early.png" alt="Early contact. The lower edge begins to buckle." style="width: 100%;">
+				<figcaption>Early contact. The lower edge begins to buckle.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part4-default-folding.png" alt="Mid-fall. Folds collect at the floor while the upper cloth remains upright." style="width: 100%;">
+				<figcaption>Mid-fall. Folds collect at the floor while the upper cloth remains upright.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part4-default-settled.png" alt="Mostly settled. The cloth forms a low pile with visible folds." style="width: 100%;">
+				<figcaption>Mostly settled. The cloth forms a low pile with visible folds.</figcaption>
+			</figure>
+		</div>
+
+		<h3>Density and stiffness</h3>
+		<p>We captured each comparison after 30 presses of <kbd>N</kbd> from reset, changing one parameter per run. Raising the displayed density from 15 to 60 g/cm² at 5,000 N/m produced a similar overall shape at this point in the fall. The denser cloth showed finer ripples across its lower half, while the default had broader folds near the floor. Raising stiffness from 5,000 to 50,000 N/m at the default density produced a broader roll near the floor and fewer tight ripples above it. Damping was 0.2% in all three runs.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part4-density-default.png" alt="Default settings after 30 presses of N." style="width: 100%;">
+				<figcaption>Default settings after 30 presses of N.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part4-density-high.png" alt="60 g/cm² after 30 presses of N." style="width: 100%;">
+				<figcaption>60 g/cm² after 30 presses of N.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part4-ks-high.png" alt="50,000 N/m after 30 presses of N." style="width: 100%;">
+				<figcaption>50,000 N/m after 30 presses of N.</figcaption>
+			</figure>
+		</div>
+
 
 		<h2>Part 5: Shaders</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>A shader program runs on the GPU. The vertex shader projects the mesh vertices onto the screen and passes values such as world position, normal, and texture coordinates to the rasterizer. The rasterizer interpolates those values across each triangle. The fragment shader uses the interpolated values to compute a color for each covered fragment, including lighting, surface texture, or reflections.</p>
 
-		<h2>(Optional) Part 6: Extra Credit - Additional cloth simulation features!</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-		
-		<h2>Additional Notes (please remove)</h2>
-		<ul>
-			<li>You can also add code if you'd like as so: <code>code code code</code></li>
-			<li>If you'd like to add math equations, 
-				<ul>
-					<li>You can write inline equations like so: \( a^2 + b^2 = c^2 \)</li>
-					<li>You can write display equations like so: \[ a^2 + b^2 = c^2 \]</li>
-				</ul>
-			</li>
-		</ul>
+		<h3>Blinn–Phong shading</h3>
+		<p>Blinn–Phong adds ambient, diffuse, and specular lighting. Ambient contributes a uniform base color. Diffuse lighting depends on how directly the surface normal faces the light and falls off with the square of the distance. The specular term produces a highlight where the normal aligns with the halfway direction between the light and the viewer. On the draped cloth, the diffuse term reveals the folds, and the specular term adds narrow highlights along the upper ridges.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-phong-ambient.png" alt="Ambient only. The cloth has a uniform base color." style="width: 100%;">
+				<figcaption>Ambient only. The cloth has a uniform base color.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-phong-diffuse.png" alt="Diffuse only. The folds brighten where they face the light." style="width: 100%;">
+				<figcaption>Diffuse only. The folds brighten where they face the light.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-phong-specular.png" alt="Specular only. Highlights appear along the upper ridges." style="width: 100%;">
+				<figcaption>Specular only. Highlights appear along the upper ridges.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-phong-full.png" alt="Full Blinn–Phong. All three terms are combined." style="width: 100%;">
+				<figcaption>Full Blinn–Phong. All three terms are combined.</figcaption>
+			</figure>
+		</div>
+
+		<h3>Texture mapping</h3>
+		<p>The fragment shader samples the custom purple fabric image using the cloth's interpolated UV coordinates. The texture follows the cloth across the curved surface and down the folds.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-custom-texture.png" alt="Purple fabric texture mapped onto the draped cloth." style="width: 100%; max-width: 360px; height: auto;">
+				<figcaption>Purple fabric texture mapped onto the draped cloth.</figcaption>
+			</figure>
+		</div>
+
+		<h3>Bump and displacement mapping</h3>
+		<p>Both shaders sample the same non-default height map from <code>textures/texture_3.png</code>. The relief was initially faint, so we increased the normal scaling to make the stone joints visible. Bump mapping estimates the height change in each UV direction and uses the tangent, bitangent, and normal to turn those slopes into a perturbed shading normal. This makes the stone joints visible while leaving the mesh silhouette unchanged. Displacement mapping also moves each vertex along its original normal by the sampled height times the height scale, so the map can affect the silhouette.</p>
+
+		<h4>Default-resolution views</h4>
+		<div class="figure-grid figure-grid--pair">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-bump-sphere-default.png" alt="Bump on the exposed sphere at default resolution." style="width: 100%;">
+				<figcaption>Bump on the exposed sphere at default resolution.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-bump-draped-default.png" alt="Bump on cloth draped over the default-resolution sphere." style="width: 100%;">
+				<figcaption>Bump on cloth draped over the default-resolution sphere.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-displacement-sphere-default.png" alt="Displacement on the exposed sphere at default resolution." style="width: 100%;">
+				<figcaption>Displacement on the exposed sphere at default resolution.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-draped-default-normal100-height0p02.png" alt="Displacement on cloth draped over the default-resolution sphere. Normal 100 and Height 0.02." style="width: 100%;">
+				<figcaption>Displacement on cloth draped over the default-resolution sphere. Normal 100 and Height 0.02.</figcaption>
+			</figure>
+		</div>
+		<p>The stone joints are visible in both bump renders. The 128×128 sphere has a rounder outline because the underlying mesh has more subdivisions. In the displacement renders, the 16×16 outline has broader, more angular segments. The 128×128 mesh samples the height map at more vertices, and the outline is smoother with subtle height variations at Height 0.02. Each shader uses the same settings at both resolutions.</p>
+		<div class="figure-grid figure-grid--pair">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-bump-sphere-16.png" alt="Bump on the 16×16 sphere. Normal 20 and Height 0.5." style="width: 100%;">
+				<figcaption>Bump on the 16×16 sphere. Normal 20 and Height 0.5.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-bump-sphere-128.png" alt="Bump on the 128×128 sphere. Normal 20 and Height 0.5." style="width: 100%;">
+				<figcaption>Bump on the 128×128 sphere. Normal 20 and Height 0.5.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-displacement-sphere-16.png" alt="Displacement on the 16×16 sphere. Normal 100 and Height 0.02." style="width: 100%;">
+				<figcaption>Displacement on the 16×16 sphere. Normal 100 and Height 0.02.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-displacement-sphere-128.png" alt="Displacement on the 128×128 sphere. Normal 100 and Height 0.02." style="width: 100%;">
+				<figcaption>Displacement on the 128×128 sphere. Normal 100 and Height 0.02.</figcaption>
+			</figure>
+		</div>
+
+		<h3>Mirror reflections</h3>
+		<p>The mirror shader reflects the camera-to-fragment direction about the surface normal and samples a cubemap in the reflected direction. The steep folds stretch the reflected environment into narrow bands. On the exposed sphere, the bridge and horizon bend across the curved surface.</p>
+		<div class="figure-grid">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-mirror-cloth.png" alt="Mirror on the cloth draped over the sphere." style="width: 100%;">
+				<figcaption>Mirror on the cloth draped over the sphere.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-mirror-sphere.png" alt="Mirror on the exposed sphere." style="width: 100%;">
+				<figcaption>Mirror on the exposed sphere.</figcaption>
+			</figure>
+		</div>
+
+
+
+		<h2>Extra credit: Iridescent cloth shader</h2>
+		<p>Our custom fragment shader computes the angle between the surface normal and the direction to the camera. It uses <code>1 - clamp(dot(n, v), 0, 1)</code> to blend smoothly from blue on surfaces facing the camera, through violet at intermediate angles, to gold near glancing angles. Diffuse lighting and a specular highlight make the folds visible as the colors shift with the view.</p>
+		<div class="figure-grid figure-grid--pair">
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-custom-iridescent-draped.png" alt="Blue and violet cloth draped over a sphere, with a thin gold rim">
+				<figcaption>Draped cloth. Blue faces the camera, and thin gold bands trace the rim and steep folds.</figcaption>
+			</figure>
+			<figure style="margin: 0; break-inside: avoid;">
+				<img src="assets/part5-custom-iridescent-suspended.png" alt="Suspended violet cloth with a broad gold band along its lower curve">
+				<figcaption>Suspended cloth. The broad lower curve shows a gradual transition from violet to gold.</figcaption>
+			</figure>
+		</div>
+
+		<section style="font-size: 0.875rem; color: #595959;"><h2>Acknowledgement of AI</h2>
+		<p>ChatGPT was used for debugging, HTML formatting, and writing improvement.</p></section>
 		</div>
 	</body>
 </html>
